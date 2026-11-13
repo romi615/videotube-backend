@@ -32,6 +32,21 @@ const uploadOnCloudinary = async (localFilePath) => {
   }
 };
 
+const deleteFromCloudinary = async (publicId, resourceType = "image") => {
+  try {
+    if (!publicId) return null;
+
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType, // Agar video hai toh "video" pass karna padega
+    });
+
+    return result;
+  } catch (error) {
+    console.log("Error while deleting from Cloudinary:", error);
+    return null;
+  }
+};
+
 /*const uploadOnCloudinary = async (localFilePath) => {
   try {
     if (!localFilePath || !fs.existsSync(localFilePath)) return null;
@@ -53,4 +68,4 @@ const uploadOnCloudinary = async (localFilePath) => {
   }
 };*/
 
-export { uploadOnCloudinary };
+export { uploadOnCloudinary, deleteFromCloudinary };
