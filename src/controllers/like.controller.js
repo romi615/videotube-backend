@@ -1,5 +1,6 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import { Like } from "../models/like.model.js";
+import { Video } from "../models/video.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -7,6 +8,42 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: toggle like on video
+
+  if (!videoId || !mongoose.Types.ObjectId.isValid(videoId)) {
+    throw new ApiError(400, "Invalid or missing videoId");
+  }
+
+  const userId = req.user?._id;
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized request");
+  }
+
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  const existingVideoLike = await Like.findOne({
+    video: videoId,
+    likedBy: userId,
+  });
+
+  if (existingVideoLike) {
+    await Like.findByIdAndDelete(existingVideoLike._id);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { liked: false }, "Unliked successfully"));
+  } else {
+    await Like.create({
+      video: videoId,
+      likedBy: userId,
+    });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { liked: true }, "Liked successfully"));
+  }
 });
 
 const toggleCommentLike = asyncHandler(async (req, res) => {
