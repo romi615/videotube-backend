@@ -2,6 +2,7 @@ import mongoose, { isValidObjectId } from "mongoose";
 import { Like } from "../models/like.model.js";
 import { Video } from "../models/video.model.js";
 import { Comment } from "../models/comment.model.js";
+import { Tweet } from "../models/tweet.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -91,6 +92,42 @@ const toggleCommentLike = asyncHandler(async (req, res) => {
 const toggleTweetLike = asyncHandler(async (req, res) => {
   const { tweetId } = req.params;
   //TODO: toggle like on tweet
+
+  if (!tweetId || !mongoose.Types.ObjectId.isValid(tweetId)) {
+    throw new ApiError(400, "Invalid or missing tweetId");
+  }
+
+  const userId = req.user?._id;
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized request");
+  }
+
+  const tweet = await Tweet.findById(tweetId);
+  if (!tweet) {
+    throw new ApiError(404, "Tweet not found");
+  }
+
+  const existingTweetLike = await Like.findOne({
+    tweet: tweetId,
+    likedBy: userId,
+  });
+
+  if (existingTweetLike) {
+    await Like.findByIdAndDelete(existingTweetLike._id);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { liked: false }, "Unliked successfully"));
+  } else {
+    await Like.create({
+      tweet: tweetId,
+      likedBy: userId,
+    });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { liked: true }, "Liked successfully"));
+  }
 });
 
 const getLikedVideos = asyncHandler(async (req, res) => {
