@@ -140,7 +140,51 @@ const deletePlaylist = asyncHandler(async (req, res) => {
 const updatePlaylist = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
   const { name, description } = req.body;
-  //TODO: update playlist
+
+  // 1. Check if playlistId is provided
+  if (!playlistId) {
+    throw new ApiError(400, "playlistId is missing");
+  }
+
+  // 2. Validate MongoDB ObjectId format early
+  if (!mongoose.Types.ObjectId.isValid(playlistId)) {
+    throw new ApiError(400, "Invalid playlist ID format");
+  }
+
+  // 3. Ensure at least one field is provided for update
+  if (!name && !description) {
+    throw new ApiError(
+      400,
+      "At least name or description is required to update"
+    );
+  }
+
+  // 4. Find the playlist
+  const playlist = await Playlist.findById(playlistId);
+
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found");
+  }
+
+  // 5. Verify that the logged-in user is the owner
+  if (playlist.owner.toString() !== req.user?._id.toString()) {
+    throw new ApiError(403, "You are not authorized to update this playlist");
+  }
+
+  // 6. Update fields only if new values are provided
+  if (name && name.trim() !== "") {
+    playlist.name = name.trim();
+  }
+  if (description && description.trim() !== "") {
+    playlist.description = description.trim();
+  }
+
+  // 7. Save the updated playlist document (avoids a second DB query)
+  await playlist.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, playlist, "Playlist updated successfully"));
 });
 
 export {
