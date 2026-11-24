@@ -1,5 +1,6 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import { Playlist } from "../models/playlist.model.js";
+import { Video } from "../models/video.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -96,11 +97,106 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
   const { playlistId, videoId } = req.params;
+
+  // 1. Check if both IDs are provided
+  if (!playlistId || !videoId) {
+    throw new ApiError(400, "playlistId and videoId are required");
+  }
+
+  // 2. Validate MongoDB ObjectId formats
+  if (
+    !mongoose.Types.ObjectId.isValid(playlistId) ||
+    !mongoose.Types.ObjectId.isValid(videoId)
+  ) {
+    throw new ApiError(400, "Invalid playlist ID or video ID format");
+  }
+
+  // 3. Find the playlist
+  const playlist = await Playlist.findById(playlistId);
+
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found");
+  }
+
+  // 4. Verify ownership (only the owner can add videos to their playlist)
+  if (playlist.owner.toString() !== req.user?._id.toString()) {
+    throw new ApiError(403, "You are not authorized to modify this playlist");
+  }
+
+  // 5. Verify that the video actually exists in the database
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  // 6. Add video to playlist using $addToSet (prevents duplicates automatically)
+  const updatedPlaylist = await Playlist.findByIdAndUpdate(
+    playlistId,
+    {
+      $addToSet: { videos: videoId },
+    },
+    { new: true }
+  ).populate("videos"); // Optional: populate videos so client immediately sees the video details
+
+  // 7. Send success response
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        updatedPlaylist,
+        "Video added to playlist successfully"
+      )
+    );
 });
 
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
   const { playlistId, videoId } = req.params;
-  // TODO: remove video from playlist
+
+  // 1. Check if both IDs are provided
+  if (!playlistId || !videoId) {
+    throw new ApiError(400, "playlistId and videoId are required");
+  }
+
+  // 2. Validate MongoDB ObjectId formats
+  if (
+    !mongoose.Types.ObjectId.isValid(playlistId) ||
+    !mongoose.Types.ObjectId.isValid(videoId)
+  ) {
+    throw new ApiError(400, "Invalid playlist ID or video ID format");
+  }
+
+  // 3. Find the playlist
+  const playlist = await Playlist.findById(playlistId);
+
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found");
+  }
+
+  // 4. Verify ownership (only the owner can modify their playlist)
+  if (playlist.owner.toString() !== req.user?._id.toString()) {
+    throw new ApiError(403, "You are not authorized to modify this playlist");
+  }
+
+  // 5. Remove video from playlist using $pull
+  const updatedPlaylist = await Playlist.findByIdAndUpdate(
+    playlistId,
+    {
+      $pull: { videos: videoId },
+    },
+    { new: true }
+  ).populate("videos");
+
+  // 6. Send success response
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        updatedPlaylist,
+        "Video removed from playlist successfully"
+      )
+    );
 });
 
 const deletePlaylist = asyncHandler(async (req, res) => {
