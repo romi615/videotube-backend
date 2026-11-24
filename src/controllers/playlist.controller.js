@@ -69,6 +69,29 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
 const getPlaylistById = asyncHandler(async (req, res) => {
   const { playlistId } = req.params;
   //TODO: get playlist by id
+
+  // 1. Check if playlistId is provided
+  if (!playlistId) {
+    throw new ApiError(400, "playlistId is missing");
+  }
+
+  // 2. Validate if playlistId is a valid MongoDB ObjectId
+  if (!mongoose.Types.ObjectId.isValid(playlistId)) {
+    throw new ApiError(400, "Invalid playlistId format");
+  }
+
+  // 3. Fetch playlist by ID and populate its videos (if applicable)
+  const playlist = await Playlist.findById(playlistId).populate("videos");
+
+  // 4. Check if the playlist actually exists in the database
+  if (!playlist) {
+    throw new ApiError(404, "Playlist not found");
+  }
+
+  // 5. Send success response
+  return res
+    .status(200)
+    .json(new ApiResponse(200, playlist, "Playlist fetched successfully"));
 });
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
